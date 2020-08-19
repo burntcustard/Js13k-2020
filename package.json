@@ -1,0 +1,31 @@
+{
+  "name": "js13k-build-scripts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js",
+    "start": "node build.js --watch",
+    "debug": "node build.js --watch --debug --visual-debug"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burntcustard/js13k-build-scripts.git"
+  },
+  "author": "burntcustard <burntcustard@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/burntcustard/js13k-build-scripts/issues"
+  },
+  "homepage": "https://github.com/burntcustard/js13k-build-scripts#readme",
+  "dependencies": {
+    "ansi-colors": "^4.1.1",
+    "browser-sync": "^2.26.12",
+    "jszip": "^3.5.0",
+    "kontra": "^7.0.0",
+    "rollup": "^2.23.1",
+    "rollup-plugin-kontra": "^1.0.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "terser": "^5.0.0"
+  }
+}
