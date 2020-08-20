@@ -91,9 +91,6 @@
     return { canvas: canvasEl, context };
   }
 
-  // noop function
-  const noop = () => {};
-
   /**
    * Rotate a point by an angle.
    * @function rotatePoint
@@ -144,6 +141,14 @@
       this.x = x;
       this.y = y;
 
+      // preserve vector clamping when creating new vectors
+      if (vec._c) {
+        this.clamp(vec._a, vec._b, vec._d, vec._e);
+
+        // reset x and y so clamping takes effect
+        this.x = x;
+        this.y = y;
+      }
     }
 
     /**
@@ -163,13 +168,163 @@
       );
     }
 
+    /**
+     * Calculate the subtraction of the current vector with the given vector.
+     * @memberof Vector
+     * @function subtract
+     *
+     * @param {Vector|{x: number, y: number}} vector - Vector to subtract from the current Vector.
+     *
+     * @returns {Vector} A new Vector instance whose value is the subtraction of the two vectors.
+     */
+     subtract(vec) {
+      return new Vector(
+        this.x - vec.x,
+        this.y - vec.y,
+        this
+      );
+    }
 
+    /**
+     * Calculate the multiple of the current vector by a value.
+     * @memberof Vector
+     * @function scale
+     *
+     * @param {Number} value - Value to scale the current Vector.
+     *
+     * @returns {Vector} A new Vector instance whose value is multiplied by the scalar.
+     */
+    scale(value) {
+      return new Vector(
+        this.x * value,
+        this.y * value
+      );
+    }
 
+    /**
+     * Calculate the normalized value of the current vector. Requires the Vector [length](api/vector#length) function.
+     * @memberof Vector
+     * @function normalize
+     *
+     * @returns {Vector} A new Vector instance whose value is the normalized vector.
+     */
+    // @see https://github.com/jed/140bytes/wiki/Byte-saving-techniques#use-placeholder-arguments-instead-of-var
+    normalize(length = this.length()) {
+      return new Vector(
+        this.x / length,
+        this.y / length
+      );
+    }
 
+    /**
+     * Calculate the dot product of the current vector with the given vector.
+     * @memberof Vector
+     * @function dot
+     *
+     * @param {Vector|{x: number, y: number}} vector - Vector to dot product against.
+     *
+     * @returns {Number} The dot product of the vectors.
+     */
+    dot(vec) {
+      return this.x * vec.x + this.y * vec.y;
+    }
 
+    /**
+     * Calculate the length (magnitude) of the Vector.
+     * @memberof Vector
+     * @function length
+     *
+     * @returns {Number} The length of the vector.
+     */
+    length() {
+      return Math.hypot(this.x, this.y);
+    }
 
+    /**
+     * Calculate the distance between the current vector and the given vector.
+     * @memberof Vector
+     * @function distance
+     *
+     * @param {Vector|{x: number, y: number}} vector - Vector to calculate the distance between.
+     *
+     * @returns {Number} The distance between the two vectors.
+     */
+    distance(vec) {
+      return Math.hypot(this.x - vec.x, this.y - vec.y);
+    }
 
+    /**
+     * Calculate the angle (in radians) between the current vector and the given vector. Requires the Vector [dot](api/vector#dot) and [length](api/vector#length) functions.
+     * @memberof Vector
+     * @function angle
+     *
+     * @param {Vector} vector - Vector to calculate the angle between.
+     *
+     * @returns {Number} The angle (in radians) between the two vectors.
+     */
+    angle(vec) {
+      return Math.acos(this.dot(vec) / (this.length() * vec.length()));
+    }
 
+    /**
+     * Clamp the Vector between two points, preventing `x` and `y` from going below or above the minimum and maximum values. Perfect for keeping a sprite from going outside the game boundaries.
+     *
+     * ```js
+     * import { Vector } from 'kontra';
+     *
+     * let vector = Vector(100, 200);
+     * vector.clamp(0, 0, 200, 300);
+     *
+     * vector.x += 200;
+     * console.log(vector.x);  //=> 200
+     *
+     * vector.y -= 300;
+     * console.log(vector.y);  //=> 0
+     *
+     * vector.add({x: -500, y: 500});
+     * console.log(vector);    //=> {x: 0, y: 300}
+     * ```
+     * @memberof Vector
+     * @function clamp
+     *
+     * @param {Number} xMin - Minimum x value.
+     * @param {Number} yMin - Minimum y value.
+     * @param {Number} xMax - Maximum x value.
+     * @param {Number} yMax - Maximum y value.
+     */
+    clamp(xMin, yMin, xMax, yMax) {
+      this._c = true;
+      this._a = xMin;
+      this._b = yMin;
+      this._d = xMax;
+      this._e = yMax;
+    }
+
+    /**
+     * X coordinate of the vector.
+     * @memberof Vector
+     * @property {Number} x
+     */
+    get x() {
+      return this._x;
+    }
+
+    /**
+     * Y coordinate of the vector.
+     * @memberof Vector
+     * @property {Number} y
+     */
+    get y() {
+      return this._y;
+    }
+
+    set x(value) {
+      this._x = (this._c ? clamp(this._a, this._d, value) : value);
+    }
+
+    set y(value) {
+      this._y = (this._c ? clamp(this._b, this._e, value) : value);
+    }
   }
 
   function factory$1() {
@@ -200,7 +355,7 @@
       // --------------------------------------------------
 
       /**
-       * The game objects position vector. Represents the local position of the object as opposed to the [world](/api/gameObject#world) position.
+       * The game objects position vector. Represents the local position of the object as opposed to the [world](api/gameObject#world) position.
        * @property {Vector} position
        * @memberof GameObject
        * @page GameObject
@@ -219,7 +374,21 @@
        */
       this.velocity = factory$1();
 
+      /**
+       * The game objects acceleration vector.
+       * @memberof GameObject
+       * @property {Vector} acceleration
+       * @page GameObject
+       */
+      this.acceleration = factory$1();
 
+      /**
+       * How may frames the game object should be alive.
+       * @memberof GameObject
+       * @property {Number} ttl
+       * @page GameObject
+       */
+      this.ttl = Infinity;
 
       // add all properties to the object, overriding any defaults
       Object.assign(this, properties);
@@ -276,13 +445,24 @@
      *
      */
     advance(dt) {
+      let acceleration = this.acceleration;
+
+      if (dt) {
+        acceleration = acceleration.scale(dt);
+      }
+
+      this.velocity = this.velocity.add(acceleration);
 
       let velocity = this.velocity;
 
+      if (dt) {
+        velocity = velocity.scale(dt);
+      }
 
       this.position = this.position.add(velocity);
       this._pc();
 
+      this.ttl--;
     }
 
     // --------------------------------------------------
@@ -321,14 +501,55 @@
     // acceleration
     // --------------------------------------------------
 
+    /**
+     * X coordinate of the acceleration vector.
+     * @memberof GameObject
+     * @property {Number} ddx
+     * @page GameObject
+     */
+    get ddx() {
+      return this.acceleration.x;
+    }
+
+    /**
+     * Y coordinate of the acceleration vector.
+     * @memberof GameObject
+     * @property {Number} ddy
+     * @page GameObject
+     */
+    get ddy() {
+      return this.acceleration.y;
+    }
+
+    set ddx(value) {
+      this.acceleration.x = value;
+    }
+
+    set ddy(value) {
+      this.acceleration.y = value;
+    }
 
     // --------------------------------------------------
     // ttl
     // --------------------------------------------------
 
+    /**
+     * Check if the game object is alive.
+     * @memberof GameObject
+     * @function isAlive
+     * @page GameObject
+     *
+     * @returns {Boolean} `true` if the game objects [ttl](api/gameObject#ttl) property is above `0`, `false` otherwise.
+     */
+    isAlive() {
+      return this.ttl > 0;
+    }
 
     _pc() {}
   }
+
+  // noop function
+  const noop = () => {};
 
   /**
    * The base class of most renderable classes. Handles things such as position, rotation, anchor, and the update and render life cycle.
@@ -383,14 +604,14 @@
       // --------------------------------------------------
 
       /**
-       * The width of the game object. Represents the local width of the object as opposed to the [world](/api/gameObject#world) width.
+       * The width of the game object. Represents the local width of the object as opposed to the [world](api/gameObject#world) width.
        * @memberof GameObject
        * @property {Number} width
        */
       width = 0,
 
       /**
-       * The height of the game object. Represents the local height of the object as opposed to the [world](/api/gameObject#world) height.
+       * The height of the game object. Represents the local height of the object as opposed to the [world](api/gameObject#world) height.
        * @memberof GameObject
        * @property {Number} height
        */
@@ -410,15 +631,115 @@
       // optionals
       // --------------------------------------------------
 
+      /**
+       * The game objects parent object.
+       * @memberof GameObject
+       * @property {GameObject|null} parent
+       */
 
+      /**
+       * The game objects children objects.
+       * @memberof GameObject
+       * @property {GameObject[]} children
+       */
+      children = [],
 
+      /**
+       * The x and y origin of the game object. {x:0, y:0} is the top left corner of the game object, {x:1, y:1} is the bottom right corner.
+       * @memberof GameObject
+       * @property {{x: number, y: number}} anchor
+       *
+       * @example
+       * // exclude-code:start
+       * let { GameObject } = kontra;
+       * // exclude-code:end
+       * // exclude-script:start
+       * import { GameObject } from 'kontra';
+       * // exclude-script:end
+       *
+       * let gameObject = GameObject({
+       *   x: 150,
+       *   y: 100,
+       *   width: 50,
+       *   height: 50,
+       *   color: 'red',
+       *   // exclude-code:start
+       *   context: context,
+       *   // exclude-code:end
+       *   render: function() {
+       *     this.context.fillStyle = this.color;
+       *     this.context.fillRect(0, 0, this.height, this.width);
+       *   }
+       * });
+       *
+       * function drawOrigin(gameObject) {
+       *   gameObject.context.fillStyle = 'yellow';
+       *   gameObject.context.beginPath();
+       *   gameObject.context.arc(gameObject.x, gameObject.y, 3, 0, 2*Math.PI);
+       *   gameObject.context.fill();
+       * }
+       *
+       * gameObject.render();
+       * drawOrigin(gameObject);
+       *
+       * gameObject.anchor = {x: 0.5, y: 0.5};
+       * gameObject.x = 300;
+       * gameObject.render();
+       * drawOrigin(gameObject);
+       *
+       * gameObject.anchor = {x: 1, y: 1};
+       * gameObject.x = 450;
+       * gameObject.render();
+       * drawOrigin(gameObject);
+       */
+      anchor = {x: 0, y: 0},
 
+      /**
+       * The X coordinate of the camera.
+       * @memberof GameObject
+       * @property {Number} sx
+       */
+      sx = 0,
 
+      /**
+       * The Y coordinate of the camera.
+       * @memberof GameObject
+       * @property {Number} sy
+       */
+      sy = 0,
 
+      /**
+       * The opacity of the object. Represents the local opacity of the object as opposed to the [world](api/gameObject#world) opacity.
+       * @memberof GameObject
+       * @property {Number} opacity
+       */
+      opacity = 1,
+
+      /**
+       * The rotation of the game object around the anchor in radians. . Represents the local rotation of the object as opposed to the [world](api/gameObject#world) rotation.
+       * @memberof GameObject
+       * @property {Number} rotation
+       */
+      rotation = 0,
+
+      /**
+       * The x scale of the object. Represents the local x scale of the object as opposed to the [world](api/gameObject#world) x scale.
+       * @memberof GameObject
+       * @property {Number} scaleX
+       */
+      scaleX = 1,
+
+      /**
+       * The y scale of the object. Represents the local y scale of the object as opposed to the [world](api/gameObject#world) y scale.
+       * @memberof GameObject
+       * @property {Number} scaleY
+       */
+      scaleY = 1,
 
       ...props
     } = {}) {
 
+      this.children = [];
 
       // by setting defaults to the parameters and passing them into
       // the init, we can ensure that a parent class can set overriding
@@ -430,10 +751,17 @@
         height,
         context,
 
+        anchor,
 
+        sx,
+        sy,
 
+        opacity,
 
+        rotation,
 
+        scaleX,
+        scaleY,
 
         ...props
       });
@@ -442,12 +770,22 @@
       this._di = true;
       this._uw();
 
+      children.map(child => this.addChild(child));
 
       // rf = render function
       this._rf = render;
 
       // uf = update function
       this._uf = update;
+    }
+
+    /**
+     * Update all children
+     */
+    update(dt) {
+      this._uf(dt);
+
+      this.children.map(child => child.update && child.update());
     }
 
     /**
@@ -470,14 +808,58 @@
         context.translate(this.x, this.y);
       }
 
+      // 2) rotate around the anchor
+      //
+      // it's faster to only rotate when set rather than always rotating
+      // @see https://jsperf.com/rotate-or-if-statement/2
+      if (this.rotation) {
+        context.rotate(this.rotation);
+      }
 
+      // 3) translate to the camera position after rotation so camera
+      // values are in the direction of the rotation rather than always
+      // along the x/y axis
+      if (this.sx || this.sy) {
+        context.translate(-this.sx, -this.sy);
+      }
 
+      // 4) scale after translation to position so object can be
+      // scaled in place (rather than scaling position as well).
+      //
+      // it's faster to only scale if one of the values is not 1
+      // rather than always scaling
+      // @see https://jsperf.com/scale-or-if-statement/4
+      if (this.scaleX != 1 || this.scaleY != 1) {
+        context.scale(this.scaleX, this.scaleY);
+      }
 
+      // 5) translate to the anchor so (0,0) is the top left corner
+      // for the render function
+      let anchorX = -this.width * this.anchor.x;
+      let anchorY = -this.height * this.anchor.y;
 
+      if (anchorX || anchorY) {
+        context.translate(anchorX, anchorY);
+      }
+
+      // it's not really any faster to gate the global alpha
+      // @see https://jsperf.com/global-alpha-or-if-statement/1
+      this.context.globalAlpha = this.opacity;
 
       this._rf();
 
+      // 7) translate back to the anchor so children use the correct
+      // x/y value from the anchor
+      if (anchorX || anchorY) {
+        context.translate(-anchorX, -anchorY);
+      }
 
+      // perform all transforms on the parent before rendering the children
+      let children = this.children;
+      if (filterObjects) {
+        children = children.filter(filterObjects);
+      }
+      children.map(child => child.render && child.render());
 
       context.restore();
     }
@@ -522,6 +904,7 @@
     _pc(prop, value) {
       this._uw();
 
+      this.children.map(child => child._pc());
     }
 
     /**
@@ -581,6 +964,17 @@
       // don't update world properties until after the init has finished
       if (!this._di) return;
 
+      let {
+        _wx = 0,
+        _wy = 0,
+
+        _wo = 1,
+
+        _wr = 0,
+
+        _wsx = 1,
+        _wsy = 1
+      } = (this.parent || {});
 
       // wx = world x, wy = world y
       this._wx = this.x;
@@ -590,9 +984,27 @@
       this._ww = this.width;
       this._wh = this.height;
 
+      // wo = world opacity
+      this._wo = _wo * this.opacity;
 
+      // wr = world rotation
+      this._wr = _wr + this.rotation;
 
+      let {x, y} = rotatePoint({x: this.x, y: this.y}, _wr);
+      this._wx = x;
+      this._wy = y;
 
+      // wsx = world scale x, wsy = world scale y
+      this._wsx = _wsx * this.scaleX;
+      this._wsy = _wsy * this.scaleY;
+
+      this._wx = this.x * _wsx;
+      this._wy = this.y * _wsy;
+      this._ww = this.width * this._wsx;
+      this._wh = this.height * this._wsy;
+
+      this._wx += _wx;
+      this._wy += _wy;
     }
 
     /**
@@ -607,8 +1019,12 @@
         width: this._ww,
         height: this._wh,
 
+        opacity: this._wo,
 
+        rotation: this._wr,
 
+        scaleX: this._wsx,
+        scaleY: this._wsy
       }
     }
 
@@ -616,21 +1032,129 @@
     // group
     // --------------------------------------------------
 
+    /**
+     * Add an object as a child to this object. The childs [world](api/gameObject#world) property will be updated to take into account this object and all of its parents.
+     * @memberof GameObject
+     * @function addChild
+     *
+     * @param {GameObject} child - Object to add as a child.
+     *
+     * @example
+     * // exclude-code:start
+     * let { GameObject } = kontra;
+     * // exclude-code:end
+     * // exclude-script:start
+     * import { GameObject } from 'kontra';
+     * // exclude-script:end
+     *
+     * function createObject(x, y, color, size = 1) {
+     *   return GameObject({
+     *     x,
+     *     y,
+     *     width: 50 / size,
+     *     height: 50 / size,
+     *     anchor: {x: 0.5, y: 0.5},
+     *     color,
+     *     // exclude-code:start
+     *     context: context,
+     *     // exclude-code:end
+     *     render: function() {
+     *       this.context.fillStyle = this.color;
+     *       this.context.fillRect(0, 0, this.height, this.width);
+     *     }
+     *   });
+     * }
+     *
+     * let parent = createObject(300, 100, 'red');
+     * let child = createObject(25, 25, 'yellow', 2);
+     *
+     * parent.addChild(child);
+     *
+     * parent.render();
+     */
+    addChild(child, { absolute = false } = {}) {
+      this.children.push(child);
+      child.parent = this;
+      child._pc = child._pc || noop;
+      child._pc();
+    }
+
+    /**
+     * Remove an object as a child of this object. The removed objects [world](api/gameObject#world) property will be updated to not take into account this object and all of its parents.
+     * @memberof GameObject
+     * @function removeChild
+     *
+     * @param {GameObject} child - Object to remove as a child.
+     */
+    removeChild(child) {
+      let index = this.children.indexOf(child);
+      if (index !== -1) {
+        this.children.splice(index, 1);
+        child.parent = null;
+        child._pc();
+      }
+    }
 
     // --------------------------------------------------
     // opacity
     // --------------------------------------------------
 
+    get opacity() {
+      return this._opa;
+    }
+
+    set opacity(value) {
+      this._opa = value;
+      this._pc();
+    }
 
     // --------------------------------------------------
     // rotation
     // --------------------------------------------------
 
+    get rotation() {
+      return this._rot;
+    }
+
+    set rotation(value) {
+      this._rot = value;
+      this._pc();
+    }
 
     // --------------------------------------------------
     // scale
     // --------------------------------------------------
 
+    /**
+     * Set the x and y scale of the object. If only one value is passed, both are set to the same value.
+     * @memberof GameObject
+     * @function setScale
+     *
+     * @param {Number} x - X scale value.
+     * @param {Number} [y=x] - Y scale value.
+     */
+    setScale(x, y = x) {
+      this.scaleX = x;
+      this.scaleY = y;
+    }
+
+    get scaleX() {
+      return this._scx;
+    }
+
+    set scaleX(value) {
+      this._scx = value;
+      this._pc();
+    }
+
+    get scaleY() {
+      return this._scy;
+    }
+
+    set scaleY(value) {
+      this._scy = value;
+      this._pc();
+    }
   }
 
   function factory$2() {
@@ -639,52 +1163,268 @@
   factory$2.prototype = GameObject.prototype;
   factory$2.class = GameObject;
 
+  let fontSizeRegex = /(\d+)(\w+)/;
+
+  function parseFont(font) {
+    let match = font.match(fontSizeRegex);
+
+    // coerce string to number
+    // @see https://github.com/jed/140bytes/wiki/Byte-saving-techniques#coercion-to-test-for-types
+    let size = +match[1];
+    let unit = match[2];
+    let computed = size;
+
+    // compute font size
+    // switch(unit) {
+    //   // px defaults to the size
+
+    //   // em uses the size of the canvas when declared (but won't keep in sync with
+    //   // changes to the canvas font-size)
+    //   case 'em': {
+    //     let fontSize = window.getComputedStyle(getCanvas()).fontSize;
+    //     let parsedSize = parseFont(fontSize).size;
+    //     computed = size * parsedSize;
+    //   }
+
+    //   // rem uses the size of the HTML element when declared (but won't keep in
+    //   // sync with changes to the HTML element font-size)
+    //   case 'rem': {
+    //     let fontSize = window.getComputedStyle(document.documentElement).fontSize;
+    //     let parsedSize = parseFont(fontSize).size;
+    //     computed = size * parsedSize;
+    //   }
+    // }
+
+    return {
+      size,
+      unit,
+      computed
+    };
+  }
+
   /**
-   * A versatile way to update and draw your sprites. It can handle simple rectangles, images, and sprite sheet animations. It can be used for your main player object as well as tiny particles in a particle engine.
-   * @class Sprite
+   * An object for drawing text to the screen. Supports newline characters as well as automatic new lines when setting the `width` property.
+   *
+   * You can also display RTL languages by setting the attribute `dir="rtl"` on the main canvas element. Due to the limited browser support for individual text to have RTL settings, it must be set globally for the entire game.
+   *
+   * @example
+   * // exclude-code:start
+   * let { Text } = kontra;
+   * // exclude-code:end
+   * // exclude-script:start
+   * import { Text } from 'kontra';
+   * // exclude-script:end
+   *
+   * let text = Text({
+   *   text: 'Hello World!\nI can even be multiline!',
+   *   font: '32px Arial',
+   *   color: 'white',
+   *   x: 300,
+   *   y: 100,
+   *   anchor: {x: 0.5, y: 0.5},
+   *   textAlign: 'center'
+   * });
+   * // exclude-code:start
+   * text.context = context;
+   * // exclude-code:end
+   *
+   * text.render();
+   * @class Text
    * @extends GameObject
    *
-   * @param {Object} [properties] - Properties of the sprite.
-   * @param {String} [properties.color] - Fill color for the game object if no image or animation is provided.
-   * @param {HTMLImageElement|HTMLCanvasElement} [properties.image] - Use an image to draw the sprite.
-   * @param {Object} [properties.animations] - An object of [Animations](api/animation) from a [Spritesheet](api/spriteSheet) to animate the sprite.
+   * @param {Object} properties - Properties of the text.
+   * @param {String} properties.text - The text to display.
+   * @param {String} [properties.font] - The [font](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/font) style. Defaults to the main context font.
+   * @param {String} [properties.color] - Fill color for the text. Defaults to the main context fillStyle.
+   * @param {Number} [properties.width] - Set a fixed width for the text. If set, the text will automatically be split into new lines that will fit the size when possible.
+   * @param {String} [properties.textAlign='left'] - The [textAlign](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/textAlign) for the context. If the `dir` attribute is set to `rtl` on the main canvas, the text will automatically be aligned to the right, but you can override that by setting this property.
+   * @param {Number} [properties.lineHeight=1] - The distance between two lines of text.
    */
-  class Sprite extends factory$2.class {
-    /**
-     * @docs docs/api_docs/sprite.js
-     */
+  class Text extends factory$2.class {
 
     init({
+
+      // --------------------------------------------------
+      // defaults
+      // --------------------------------------------------
+
       /**
-       * The color of the game object if it was passed as an argument.
-       * @memberof Sprite
+       * The string of text. Use newline characters to create multi-line strings.
+       * @memberof Text
+       * @property {String} text
+       */
+      text = '',
+
+      /**
+       * The text alignment.
+       * @memberof Text
+       * @property {String} textAlign
+       */
+      textAlign = '',
+
+      /**
+       * The distance between two lines of text. The value is multiplied by the texts font size.
+       * @memberof Text
+       * @property {Number} lineHeight
+       */
+      lineHeight = 1,
+
+     /**
+      * The font style.
+      * @memberof Text
+      * @property {String} font
+      */
+      font = getContext().font,
+
+      /**
+       * The color of the text.
+       * @memberof Text
        * @property {String} color
        */
 
-
-      ...props
+       ...props
     } = {}) {
       super.init({
+        text,
+        textAlign,
+        lineHeight,
+        font,
         ...props
       });
+
+      // p = prerender
+      this._p();
     }
 
+    // keep width and height getters/settings so we can set _w and _h and not
+    // trigger infinite call loops
+    get width() {
+      // w = width
+      return this._w;
+    }
+
+    set width(value) {
+      // d = dirty
+      this._d = true;
+      this._w = value;
+
+      // fw = fixed width
+      this._fw = value;
+    }
+
+    get text() {
+      return this._t;
+    }
+
+    set text(value) {
+      this._d = true;
+      this._t = value;
+    }
+
+    get font() {
+      return this._f;
+    }
+
+    set font(value) {
+      this._d = true;
+      this._f = value;
+      this._fs = parseFont(value).computed;
+    }
+
+    get lineHeight() {
+      // lh = line height
+      return this._lh;
+    }
+
+    set lineHeight(value) {
+      this._d = true;
+      this._lh = value;
+    }
+
+    render() {
+      if (this._d) {
+        this._p();
+      }
+      super.render();
+    }
+
+    /**
+     * Calculate the font width, height, and text strings before rendering.
+     */
+    _p() {
+      // s = strings
+      this._s = [];
+      this._d = false;
+      let context = this.context;
+
+      context.font = this.font;
+
+      if (!this._s.length && this._fw) {
+        let parts = this.text.split(' ');
+        let start = 0;
+        let i = 2;
+
+        // split the string into lines that all fit within the fixed width
+        for (; i <= parts.length; i++) {
+          let str = parts.slice(start, i).join(' ');
+          let width = context.measureText(str).width;
+
+          if (width > this._fw) {
+            this._s.push(parts.slice(start, i - 1).join(' '));
+            start = i - 1;
+          }
+        }
+
+        this._s.push(parts.slice(start, i).join(' '));
+      }
+
+      if (!this._s.length && this.text.includes('\n')) {
+        let width = 0;
+        this.text.split('\n').map(str => {
+          this._s.push(str);
+          width = Math.max(width, context.measureText(str).width);
+        });
+
+        this._w = this._fw || width;
+      }
+
+      if (!this._s.length) {
+        this._s.push(this.text);
+        this._w = this._fw || context.measureText(this.text).width;
+      }
+
+      this.height = this._fs + ((this._s.length - 1) * this._fs * this.lineHeight);
+      this._uw();
+    }
 
     draw() {
+      let alignX = 0;
+      let textAlign = this.textAlign;
+      let context = this.context;
 
+      textAlign = this.textAlign || (context.canvas.dir === 'rtl' ? 'right' : 'left');
 
-      if (this.color) {
-        this.context.fillStyle = this.color;
-        this.context.fillRect(0, 0, this.width, this.height);
-      }
+      alignX = textAlign === 'right'
+        ? this.width
+        : textAlign === 'center'
+          ? this.width / 2 | 0
+          : 0;
+
+      this._s.map((str, index) => {
+        context.textBaseline = 'top';
+        context.textAlign = textAlign;
+        context.fillStyle = this.color;
+        context.font = this.font;
+        context.fillText(str, alignX, this._fs * this.lineHeight * index);
+      });
     }
   }
 
-  function factory$3() {
-    return new Sprite(...arguments);
+  function factory$4() {
+    return new Text(...arguments);
   }
-  factory$3.prototype = Sprite.prototype;
-  factory$3.class = Sprite;
+  factory$4.prototype = Text.prototype;
+  factory$4.class = Text;
 
   /**
    * Clear the canvas.
@@ -850,39 +1590,42 @@
     return loop;
   }
 
-  function test() {
-    console.log('test file imported');
-  }
-
   let { canvas } = init();
 
-  test();
+  const messages = [];
 
-  let sprite = factory$3({
-    x: 100,        // starting x,y position of the sprite
-    y: 80,
-    color: 'red',  // fill color of the sprite rectangle
-    width: 20,     // width and height of the sprite rectangle
-    height: 40,
-    dx: 2          // move the sprite 2px to the right every frame
-  });
-
-  let loop = GameLoop({  // create the main game loop
-    update: function() { // update the game state
-      sprite.update();
-
-      // wrap the sprites position when it reaches
-      // the edge of the screen
-      if (sprite.x > canvas.width) {
-        sprite.x = -sprite.width;
+  function newMessage(message) {
+      if (messages.length > 4) {
+          messages.shift();
       }
-    },
-    render: function() { // render the game state
-      sprite.render();
-    }
+      messages.push(factory$4({
+          text: message,
+          font: '20px Arial',
+          color: 'black',
+          x: 10,
+          y: 20,
+          opacity: 1,
+      }));
+      messages.forEach(m => {
+          m.y += 20;
+      });
+  }
+
+  let i = 0;
+
+  let loop = GameLoop({
+      update: function() {
+          i++;
+          if (i % 60 === 0) {
+              newMessage('test' + i);
+          }
+      },
+      render: function() {
+          messages.forEach(m => m.render());
+      }
   });
 
-  loop.start();    // start the game
+  loop.start();
 
 }());
 //# sourceMappingURL=game.js.map

@@ -76,7 +76,35 @@ const compile = async () => {
                 resolve(),
                 kontra({
                     gameObject: {
+                        acceleration: true,
+                        anchor: true,
+                        camera: true,
+                        group: true,
+                        opacity: true,
+                        rotation: true,
+                        scale: true,
+                        ttl: true,
                         velocity: true
+                    },
+                    sprite: {
+                        animation: true,
+                        image: true,
+                    },
+                    text: {
+                        autoNewline: true,
+                        newline: true,
+                        rtl: true,
+                        textAlign: true
+                    },
+                    vector: {
+                        angle: true,
+                        clamp: true,
+                        distance: true,
+                        dot: true,
+                        length: true,
+                        normalize: true,
+                        scale: true,
+                        subtract: true
                     },
                     debug: DEBUG
                 })
@@ -136,10 +164,10 @@ async function minify() {
     const options = {
         compress: {
             passes: 2,
-            unsafe: true,
-            unsafe_arrows: true,
-            unsafe_comps: true,
-            unsafe_math: true,
+            // unsafe: true,
+            // unsafe_arrows: true,
+            // unsafe_comps: true,
+            // unsafe_math: true,
             // unsafe_proto: true,
             // booleans_as_integers: true
         },
@@ -159,6 +187,11 @@ async function minify() {
     console.log('Minifying JS...');
 
     let code = fs.readFileSync('dist/game.js', 'utf8');
+
+    if (DEBUG) {
+      return code;
+    }
+
     const result = await terser.minify(code, options);
 
     if (result.error) {
