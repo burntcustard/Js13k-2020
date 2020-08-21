@@ -1590,21 +1590,178 @@
     return loop;
   }
 
+  /**
+   * A minimalistic keyboard API. You can use it move the main sprite or respond to a key press.
+   *
+   * ```js
+   * import { initKeys, keyPressed } from 'kontra';
+   *
+   * // this function must be called first before keyboard
+   * // functions will work
+   * initKeys();
+   *
+   * function update() {
+   *   if (keyPressed('left')) {
+   *     // move left
+   *   }
+   * }
+   * ```
+   * @sectionName Keyboard
+   */
+
+  /**
+   * Below is a list of keys that are provided by default. If you need to extend this list, you can use the [keyMap](api/keyboard#keyMap) property.
+   *
+   * - a-z
+   * - 0-9
+   * - enter, esc, space, left, up, right, down
+   * @sectionName Available Keys
+   */
+
+  let callbacks$2 = {};
+  let pressedKeys = {};
+
+  /**
+   * A map of keycodes to key names. Add to this object to expand the list of [available keys](api/keyboard#available-keys).
+   *
+   * ```js
+   * import { keyMap, bindKeys } from 'kontra';
+   *
+   * keyMap[34] = 'pageDown';
+   *
+   * bindKeys('pageDown', function(e) {
+   *   // handle pageDown key
+   * });
+   * ```
+   * @property {{[key in (String|Number)]: string}} keyMap
+   */
+  let keyMap = {
+    // named keys
+    'Enter': 'enter',
+    'Escape': 'esc',
+    'Space': 'space',
+    'ArrowLeft': 'left',
+    'ArrowUp': 'up',
+    'ArrowRight': 'right',
+    'ArrowDown': 'down'
+  };
+
+  /**
+   * Execute a function that corresponds to a keyboard key.
+   *
+   * @param {KeyboardEvent} evt
+   */
+  function keydownEventHandler(evt) {
+    let key = keyMap[evt.code];
+    pressedKeys[key] = true;
+
+    if (callbacks$2[key]) {
+      callbacks$2[key](evt);
+    }
+  }
+
+  /**
+   * Set the released key to not being pressed.
+   *
+   * @param {KeyboardEvent} evt
+   */
+  function keyupEventHandler(evt) {
+    pressedKeys[ keyMap[evt.code] ] = false;
+  }
+
+  /**
+   * Reset pressed keys.
+   */
+  function blurEventHandler$1() {
+    pressedKeys = {};
+  }
+
+  /**
+   * Initialize keyboard event listeners. This function must be called before using other keyboard functions.
+   * @function initKeys
+   */
+  function initKeys() {
+    let i;
+
+    // alpha keys
+    // @see https://stackoverflow.com/a/43095772/2124254
+    for (i = 0; i < 26; i++) {
+      // rollupjs considers this a side-effect (for now), so we'll do it in the
+      // initKeys function
+      keyMap[i + 65] = keyMap['Key' + String.fromCharCode(i + 65)] = String.fromCharCode(i + 97);
+    }
+
+    // numeric keys
+    for (i = 0; i < 10; i++) {
+      keyMap[48+i] = keyMap['Digit'+i] = ''+i;
+    }
+
+    window.addEventListener('keydown', keydownEventHandler);
+    window.addEventListener('keyup', keyupEventHandler);
+    window.addEventListener('blur', blurEventHandler$1);
+  }
+
+  /**
+   * Check if a key is currently pressed. Use during an `update()` function to perform actions each frame.
+   *
+   * ```js
+   * import { Sprite, initKeys, keyPressed } from 'kontra';
+   *
+   * initKeys();
+   *
+   * let sprite = Sprite({
+   *   update: function() {
+   *     if (keyPressed('left')){
+   *       // left arrow pressed
+   *     }
+   *     else if (keyPressed('right')) {
+   *       // right arrow pressed
+   *     }
+   *
+   *     if (keyPressed('up')) {
+   *       // up arrow pressed
+   *     }
+   *     else if (keyPressed('down')) {
+   *       // down arrow pressed
+   *     }
+   *   }
+   * });
+   * ```
+   * @function keyPressed
+   *
+   * @param {String} key - Key to check for pressed state.
+   *
+   * @returns {Boolean} `true` if the key is pressed, `false` otherwise.
+   */
+  function keyPressed(key) {
+    return !!pressedKeys[key];
+  }
+
   let { canvas } = init();
 
-  const messages = [];
+  initKeys();
+
+  let messages = [];
 
   function newMessage(message) {
-      if (messages.length > 4) {
-          messages.shift();
-      }
       messages.push(factory$4({
           text: message,
           font: '20px Arial',
           color: 'black',
           x: 10,
-          y: 20,
+          y: 0,
           opacity: 1,
+          ttl: 180,
+          update: function() {
+              if (this.isAlive()) {
+                  this.ttl--;
+                  return;
+              }
+              this.opacity -= .02;
+              if (this.opacity <= 0) {
+                  this.opacity = 0;
+              }
+          }
       }));
       messages.forEach(m => {
           m.y += 20;
@@ -1613,15 +1770,102 @@
 
   let i = 0;
 
+  let player = factory$2({
+      x: 1,
+      y: 1,
+      cooldowns: {
+          yPos: 60,
+          yNeg: 60,
+          xPos: 60,
+          xNeg: 60,
+      },
+      update: function() {
+          for (cooldownName in this.cooldowns) {
+              if (this.cooldowns[cooldownName] > 0) {
+                  this.cooldowns[cooldownName]--;
+              }
+          }
+      }
+  });
+
+  let width = 22;
+
+  let initial =  ('' +
+      '▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜\n' +
+      '▌╭──▝▀▘──╮#####╭──╮;▐\n' +
+      '▌│       │#####│s░│.▐\n' +
+      '▌╰,..,.,,╯#┌─┐#╰──╯,▐\n' +
+      '▌;,.,;,,.,..,/ /,..,▐\n' +
+      '▌.;.,.,;,,.,/ /,..╻,▐\n' +
+      '▌,.,;.(f).,...,.,(w)▐\n' +
+      '▌-------------------▐'   +
+  '').split('');
+
+  let map = factory$4({
+      text: initial.join(''),
+      font: '20px Monospace',
+      color: 'black',
+      x: 120,
+      y: 0,
+      lineHeight: 1,
+      update: function() {
+          let newText = [...initial];
+          newText[player.y * width + player.x] = '@';
+          this.text = newText.join('');
+      }
+  });
+
+  map.render();
+
+  console.log(map.text);
+
+  stat = factory$4({
+      text: ('' +
+          'Stamina: 4\n' +
+          'Somethings: 5'
+      ),
+      font: '20px Arial',
+      y: 20,
+      x: 420,
+      lineHeight: 1.5
+  });
+
   let loop = GameLoop({
       update: function() {
           i++;
-          if (i % 60 === 0) {
+          if (i % 120 === 0) {
               newMessage('test' + i);
+              //console.log(map.text);
           }
+          messages.forEach(m => m.update());
+          player.update();
+
+          if (keyPressed('up') && player.cooldowns.yNeg === 0) {
+            player.y--;
+            player.cooldowns.yNeg = 12;
+          }
+
+          if (keyPressed('down') && player.cooldowns.yPos === 0) {
+            player.y++;
+            player.cooldowns.yPos = 12;
+          }
+
+          if (keyPressed('left') && player.cooldowns.xNeg === 0) {
+            player.x--;
+            player.cooldowns.xNeg = 12;
+          }
+
+          if (keyPressed('right') && player.cooldowns.xPos === 0) {
+            player.x++;
+            player.cooldowns.xPos = 12;
+          }
+          map.update();
       },
       render: function() {
           messages.forEach(m => m.render());
+          messages = messages.filter(m => (m.isAlive() || m.opacity));
+          map.render();
+          //stat.render();
       }
   });
 
